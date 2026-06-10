@@ -1,6 +1,64 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
-]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "trackeval"
+version = "1.0.dev1"
+description = "Code for evaluating object tracking"
+readme = "Readme.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Jonathon Luiten"},
+    {name = "Arne Hoffhues"},
+]
+maintainers = [
+    {name = "ry-yoshida-dev"},
+]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "scipy",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+keywords = ["tracking", "evaluation", "mot", "hota"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6",
+]
+full = [
+    "matplotlib",
+    "opencv-python",
+    "pycocotools",
+    "scikit-image",
+    "Pillow",
+    "tqdm",
+    "tabulate",
+]
+
+[project.urls]
+Homepage = "https://github.com/ry-yoshida-dev/TrackEval"
+Repository = "https://github.com/ry-yoshida-dev/TrackEval"
+Issues = "https://github.com/ry-yoshida-dev/TrackEval/issues"
+Source = "https://github.com/JonathonLuiten/TrackEval"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+trackeval = ["py.typed", "datasets/burst_helpers/*.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

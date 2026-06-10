@@ -53,8 +53,12 @@ def update_config(config):
 
 
 def get_code_path():
-    """Get base path where code is"""
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    """Return the project root directory (repository root)."""
+    package_dir = os.path.dirname(__file__)
+    parent = os.path.abspath(os.path.join(package_dir, '..'))
+    if os.path.basename(parent) == 'src':
+        return os.path.abspath(os.path.join(parent, '..'))
+    return parent
 
 
 def validate_metrics_list(metrics_list):

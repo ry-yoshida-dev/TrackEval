@@ -40,7 +40,7 @@ import os
 import argparse
 from multiprocessing import freeze_support
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import trackeval  # noqa: E402
 
 if __name__ == '__main__':

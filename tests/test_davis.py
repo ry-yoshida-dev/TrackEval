@@ -3,7 +3,7 @@ import os
 import numpy as np
 from multiprocessing import freeze_support
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import trackeval  # noqa: E402
 
 # Fixes multiprocessing on windows, does nothing otherwise

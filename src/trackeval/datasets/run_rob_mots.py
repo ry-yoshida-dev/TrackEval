@@ -7,7 +7,7 @@ import csv
 import numpy as np
 from multiprocessing import freeze_support
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import trackeval  # noqa: E402
 from trackeval import utils
 code_path = utils.get_code_path()

@@ -1,0 +1,4 @@
+include LICENSE
+include Readme.md
+include pyproject.toml
+recursive-include src/trackeval/datasets/burst_helpers *.json
