@@ -1,28 +1,39 @@
+from __future__ import annotations
+
 import time
 import traceback
+from collections.abc import Mapping, Sequence
 from multiprocessing.pool import Pool
 from functools import partial
+from typing import cast
 import os
 from . import utils
 from .utils import TrackEvalException
 from . import _timing
-from .metrics import Count
+from .eval_config import EvalConfig, EvalConfigInput
+from .eval_dataset_protocol import EvalDatasetProtocol
+from .eval_metric_protocol import EvalMetricProtocol
+from .metrics.count import Count
 
 try:
     import tqdm
-    TQDM_IMPORTED = True
+    tqdm_imported = True
 except ImportError as _:
-    TQDM_IMPORTED = False
+    tqdm_imported = False
+
+EvalTrackerResult = dict[str, object] | None
+EvalOutputResults = dict[str, dict[str, EvalTrackerResult]]
+EvalOutputMessages = dict[str, dict[str, str]]
 
 
 class Evaluator:
     """Evaluator class for evaluating different metrics for different datasets"""
 
     @staticmethod
-    def get_default_eval_config():
+    def get_default_eval_config() -> EvalConfig:
         """Returns the default config values for evaluation"""
         code_path = utils.get_code_path()
-        default_config = {
+        default_config: EvalConfig = {
             'USE_PARALLEL': False,
             'NUM_PARALLEL_CORES': 8,
             'BREAK_ON_ERROR': True,  # Raises exception and exits with error
@@ -42,9 +53,12 @@ class Evaluator:
         }
         return default_config
 
-    def __init__(self, config=None):
+    def __init__(self, config: EvalConfigInput | None = None) -> None:
         """Initialise the evaluator with a config file"""
-        self.config = utils.init_config(config, self.get_default_eval_config(), 'Eval')
+        self.config: EvalConfig = cast(
+            EvalConfig,
+            cast(object, utils.init_config(config, self.get_default_eval_config(), 'Eval')),
+        )
         # Only run timing analysis if not run in parallel.
         if self.config['TIME_PROGRESS'] and not self.config['USE_PARALLEL']:
             _timing.DO_TIMING = True
@@ -52,10 +66,15 @@ class Evaluator:
                 _timing.DISPLAY_LESS_PROGRESS = True
 
     @_timing.time
-    def evaluate(self, dataset_list, metrics_list, show_progressbar=False):
+    def evaluate(
+        self,
+        dataset_list: Sequence[EvalDatasetProtocol],
+        metrics_list: Sequence[EvalMetricProtocol],
+        show_progressbar: bool = False,
+    ) -> tuple[EvalOutputResults, EvalOutputMessages]:
         """Evaluate a set of metrics on a set of datasets"""
         config = self.config
-        metrics_list = metrics_list + [Count()]  # Count metrics are always run
+        metrics_list = [*metrics_list, Count()]  # Count metrics are always run
         metric_names = utils.validate_metrics_list(metrics_list)
         dataset_names = [dataset.get_name() for dataset in dataset_list]
         output_res = {}
@@ -80,7 +99,7 @@ class Evaluator:
                     print('\nEvaluating %s\n' % tracker)
                     time_start = time.time()
                     if config['USE_PARALLEL']:
-                        if show_progressbar and TQDM_IMPORTED:
+                        if show_progressbar and tqdm_imported:
                             seq_list_sorted = sorted(seq_list)
 
                             with Pool(config['NUM_PARALLEL_CORES']) as pool, tqdm.tqdm(total=len(seq_list)) as pbar:
@@ -103,7 +122,7 @@ class Evaluator:
                                 res = dict(zip(seq_list, results))
                     else:
                         res = {}
-                        if show_progressbar and TQDM_IMPORTED:
+                        if show_progressbar and tqdm_imported:
                             seq_list_sorted = sorted(seq_list)
                             for curr_seq in tqdm.tqdm(seq_list_sorted):
                                 res[curr_seq] = eval_sequence(curr_seq, dataset, tracker, class_list, metrics_list,
@@ -212,11 +231,18 @@ class Evaluator:
 
 
 @_timing.time
-def eval_sequence(seq, dataset, tracker, class_list, metrics_list, metric_names):
+def eval_sequence(
+    seq: str,
+    dataset: EvalDatasetProtocol,
+    tracker: str,
+    class_list: Sequence[str],
+    metrics_list: Sequence[EvalMetricProtocol],
+    metric_names: Sequence[str],
+) -> dict[str, dict[str, Mapping[str, object]]]:
     """Function for evaluating a single sequence"""
 
     raw_data = dataset.get_raw_seq_data(tracker, seq)
-    seq_res = {}
+    seq_res: dict[str, dict[str, Mapping[str, object]]] = {}
     for cls in class_list:
         seq_res[cls] = {}
         data = dataset.get_preprocessed_seq_data(raw_data, cls)

@@ -1,23 +1,28 @@
 
+from __future__ import annotations
+
 import os
 import csv
 import argparse
 from collections import OrderedDict
+from collections.abc import Mapping
 
 
-def init_config(config, default_config, name=None):
+def init_config(
+    config: Mapping[str, object] | None,
+    default_config: Mapping[str, object],
+    name: str | None = None,
+) -> dict[str, object]:
     """Initialise non-given config values with defaults"""
-    if config is None:
-        config = default_config
-    else:
-        for k in default_config.keys():
-            if k not in config.keys():
-                config[k] = default_config[k]
-    if name and config['PRINT_CONFIG']:
+    result: dict[str, object] = dict(default_config) if config is None else dict(config)
+    for k in default_config.keys():
+        if k not in result.keys():
+            result[k] = default_config[k]
+    if name and result['PRINT_CONFIG']:
         print('\n%s Config:' % name)
-        for c in config.keys():
-            print('%-20s : %-30s' % (c, config[c]))
-    return config
+        for c in result.keys():
+            print('%-20s : %-30s' % (c, result[c]))
+    return result
 
 
 def update_config(config):
