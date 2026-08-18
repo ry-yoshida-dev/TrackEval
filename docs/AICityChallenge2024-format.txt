@@ -1,0 +1,49 @@
+AI City Challenge 2024 (Multi-Camera People Tracking) format
+============================================================
+
+Ground truth and tracker predictions use the same layout: one detection per
+row, fields separated by whitespace, no header.
+
+    <camera_id> <object_id> <frame_id> <xmin> <ymin> <width> <height> <xworld> <yworld>
+
+  camera_id   Integer id of the camera the detection was seen in. Bare integer,
+              so a directory named "camera_0747" appears here as 747.
+  object_id   Global identity of the person. The same id denotes the same
+              person in every camera of the scene, which is what makes the
+              association metrics measure cross-camera consistency.
+  frame_id    Frame index within the camera.
+  xmin ymin   Top-left corner of the 2D bounding box, in pixels.
+  width       Bounding box width, in pixels.
+  height      Bounding box height, in pixels.
+  xworld      Projected position on the ground plane, in meters.
+  yworld      Projected position on the ground plane, in meters.
+
+The world coordinates are read but not used for matching; similarity is 2D box
+IoU in image space.
+
+File layout
+-----------
+
+One file per scene, for the ground truth and for each tracker:
+
+    <GT_FOLDER>/<scene>/gt/gt.txt
+    <TRACKERS_FOLDER>/<tracker>/<TRACKER_SUB_FOLDER>/<scene>.txt
+
+No seqinfo.ini is needed. The camera set and the frame count of a scene are
+derived from the ground-truth file itself.
+
+Timestep flattening
+-------------------
+
+A scene spans several cameras, while a TrackEval sequence is a flat list of
+timesteps. Each (camera, frame) pair is therefore mapped to its own timestep,
+ordered camera-major:
+
+    timestep = camera_index * num_frames + frame_id
+
+Two consequences follow. Detections of different cameras never share a
+timestep, so a box is only ever matched against a box of the same camera. And
+because identities are global across the whole flattened sequence, reusing one
+identity consistently across cameras is rewarded by the association terms of
+HOTA and Identity, while giving each camera its own identity space lowers AssA
+and IDF1 without changing DetA.
