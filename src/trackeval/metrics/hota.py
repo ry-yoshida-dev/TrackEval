@@ -66,18 +66,28 @@ class HOTA(_BaseMetric):
 
         # Calculate overall jaccard alignment score (before unique matching) between IDs
         global_alignment_score = potential_matches_count / (gt_id_count + tracker_id_count - potential_matches_count)
-        matches_counts = [np.zeros_like(potential_matches_count) for _ in self.array_labels]
+
+        # A match with similarity s clears every alpha at or below it, so each
+        # match is booked once into the bucket counting the alphas it clears
+        # rather than once per alpha. Summing the buckets from the top
+        # afterwards recovers each alpha's totals, which turns the per-alpha
+        # pass over every timestep into a single pass. The extra bucket at
+        # index 0 holds the matches clearing no alpha at all.
+        num_alpha_buckets = len(self.array_labels) + 1
+        alpha_thresholds = self.array_labels - np.finfo('float').eps
+        bucket_match_count = np.zeros(num_alpha_buckets, dtype=np.int64)
+        bucket_similarity_sum = np.zeros(num_alpha_buckets, dtype=float)
+        bucket_matches_counts = np.zeros(
+            (num_alpha_buckets, data['num_gt_ids'], data['num_tracker_ids']), dtype=float
+        )
 
         # Calculate scores for each timestep
         for t, (gt_ids_t, tracker_ids_t) in enumerate(zip(data['gt_ids'], data['tracker_ids'])):
             # Deal with the case that there are no gt_det/tracker_det in a timestep.
-            if len(gt_ids_t) == 0:
-                for a, alpha in enumerate(self.array_labels):
-                    res['HOTA_FP'][a] += len(tracker_ids_t)
-                continue
-            if len(tracker_ids_t) == 0:
-                for a, alpha in enumerate(self.array_labels):
-                    res['HOTA_FN'][a] += len(gt_ids_t)
+            # Such a timestep can hold no match, and its detections reach the
+            # false negative and false positive counts through the sequence
+            # totals those are taken from once the loop is done.
+            if len(gt_ids_t) == 0 or len(tracker_ids_t) == 0:
                 continue
 
             # Get matching scores between pairs of dets for optimizing HOTA
@@ -87,18 +97,30 @@ class HOTA(_BaseMetric):
             # Hungarian algorithm to find best matches
             match_rows, match_cols = linear_sum_assignment(-score_mat)
 
-            # Calculate and accumulate basic statistics
-            for a, alpha in enumerate(self.array_labels):
-                actually_matched_mask = similarity[match_rows, match_cols] >= alpha - np.finfo('float').eps
-                alpha_match_rows = match_rows[actually_matched_mask]
-                alpha_match_cols = match_cols[actually_matched_mask]
-                num_matches = len(alpha_match_rows)
-                res['HOTA_TP'][a] += num_matches
-                res['HOTA_FN'][a] += len(gt_ids_t) - num_matches
-                res['HOTA_FP'][a] += len(tracker_ids_t) - num_matches
-                if num_matches > 0:
-                    res['LocA'][a] += sum(similarity[alpha_match_rows, alpha_match_cols])
-                    matches_counts[a][gt_ids_t[alpha_match_rows], tracker_ids_t[alpha_match_cols]] += 1
+            # Book this timestep's matches into their alpha buckets
+            matched_similarity = similarity[match_rows, match_cols]
+            cleared_alpha_count = np.searchsorted(alpha_thresholds, matched_similarity, side='right')
+            bucket_match_count += np.bincount(cleared_alpha_count, minlength=num_alpha_buckets)
+            bucket_similarity_sum += np.bincount(
+                cleared_alpha_count, weights=matched_similarity, minlength=num_alpha_buckets
+            )
+            is_cleared = cleared_alpha_count > 0
+            np.add.at(
+                bucket_matches_counts,
+                (
+                    cleared_alpha_count[is_cleared],
+                    gt_ids_t[match_rows[is_cleared]],
+                    tracker_ids_t[match_cols[is_cleared]],
+                ),
+                1,
+            )
+
+        # Recover each alpha's totals from the buckets at or above it
+        res['HOTA_TP'] = np.cumsum(bucket_match_count[::-1])[::-1][1:].astype(float)
+        res['LocA'] = np.cumsum(bucket_similarity_sum[::-1])[::-1][1:]
+        res['HOTA_FN'] = data['num_gt_dets'] - res['HOTA_TP']
+        res['HOTA_FP'] = data['num_tracker_dets'] - res['HOTA_TP']
+        matches_counts = np.cumsum(bucket_matches_counts[::-1], axis=0)[::-1][1:]
 
         # Calculate association scores (AssA, AssRe, AssPr) for the alpha value.
         # First calculate scores per gt_id/tracker_id combo and then average over the number of detections.
