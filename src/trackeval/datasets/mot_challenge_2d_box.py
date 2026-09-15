@@ -34,6 +34,7 @@ class MotChallenge2DBox(_BaseDataset):
             'SEQMAP_FILE': None,  # Directly specify seqmap file (if none use seqmap_folder/benchmark-split_to_eval)
             'SEQ_INFO': None,  # If not None, directly specify sequences to eval and their number of timesteps
             'GT_LOC_FORMAT': '{gt_folder}/{seq}/gt/gt.txt',  # '{gt_folder}/{seq}/gt/gt.txt'
+            'GT_LOC_MAP': None,  # Mapping of sequence name to gt file path, taking precedence over GT_LOC_FORMAT
             'SKIP_SPLIT_FOL': False,  # If False, data is in GT_FOLDER/BENCHMARK-SPLIT_TO_EVAL/ and in
                                       # TRACKERS_FOLDER/BENCHMARK-SPLIT_TO_EVAL/tracker/
                                       # If True, then the middle 'benchmark-split' folder is skipped for both.
@@ -86,7 +87,7 @@ class MotChallenge2DBox(_BaseDataset):
         # Check gt files exist
         for seq in self.seq_list:
             if not self.data_is_zipped:
-                curr_file = self.config["GT_LOC_FORMAT"].format(gt_folder=self.gt_fol, seq=seq)
+                curr_file = self._gt_file(seq)
                 if not os.path.isfile(curr_file):
                     print('GT file not found ' + curr_file)
                     raise TrackEvalException('GT file not found for sequence: ' + seq)
@@ -127,6 +128,19 @@ class MotChallenge2DBox(_BaseDataset):
 
     def get_display_name(self, tracker):
         return self.tracker_to_disp[tracker]
+
+    def _gt_file(self, seq):
+        """Path of the gt file of a sequence.
+
+        GT_LOC_MAP gives the path of every sequence explicitly, which allows gt files that a single
+        GT_LOC_FORMAT template cannot address, such as sequences living under different folders.
+        """
+        gt_loc_map = self.config['GT_LOC_MAP']
+        if gt_loc_map is not None:
+            if seq not in gt_loc_map:
+                raise TrackEvalException('GT_LOC_MAP has no entry for sequence: ' + seq)
+            return gt_loc_map[seq]
+        return self.config['GT_LOC_FORMAT'].format(gt_folder=self.gt_fol, seq=seq)
 
     def _get_seq_info(self):
         seq_list = []
@@ -193,7 +207,7 @@ class MotChallenge2DBox(_BaseDataset):
         else:
             zip_file = None
             if is_gt:
-                file = self.config["GT_LOC_FORMAT"].format(gt_folder=self.gt_fol, seq=seq)
+                file = self._gt_file(seq)
             else:
                 file = os.path.join(self.tracker_fol, tracker, self.tracker_sub_fol, seq + '.txt')
 

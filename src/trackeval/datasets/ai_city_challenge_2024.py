@@ -68,6 +68,7 @@ class AICityChallenge2024(_BaseDataset):
             "TRACKER_DISPLAY_NAMES": None,
             "SEQ_INFO": None,
             "GT_LOC_FORMAT": "{gt_folder}/{seq}/gt/gt.txt",
+            "GT_LOC_MAP": None,
             "SKIP_SPLIT_FOL": False,
         }
         return default_config
@@ -242,6 +243,10 @@ class AICityChallenge2024(_BaseDataset):
         """
         Path of the ground-truth file of a scene.
 
+        ``GT_LOC_MAP`` gives the path of every scene explicitly and takes
+        precedence over ``GT_LOC_FORMAT``, which allows ground-truth files that
+        a single template cannot address.
+
         Parameters
         ----------
         seq : str
@@ -251,7 +256,19 @@ class AICityChallenge2024(_BaseDataset):
         -------
         str
             Ground-truth file path.
+
+        Raises
+        ------
+        TrackEvalException
+            If ``GT_LOC_MAP`` is given but has no entry for the scene.
         """
+        gt_loc_map = self.config["GT_LOC_MAP"]
+        if isinstance(gt_loc_map, Mapping):
+            if seq not in gt_loc_map:
+                raise TrackEvalException(
+                    f"GT_LOC_MAP has no entry for sequence: {seq}"
+                )
+            return str(gt_loc_map[seq])
         return str(self.config["GT_LOC_FORMAT"]).format(
             gt_folder=self.gt_fol, seq=seq
         )

@@ -29,6 +29,10 @@ One file per scene, for the ground truth and for each tracker:
     <GT_FOLDER>/<scene>/gt/gt.txt
     <TRACKERS_FOLDER>/<tracker>/<TRACKER_SUB_FOLDER>/<scene>.txt
 
+GT_LOC_FORMAT overrides the ground-truth template, and GT_LOC_MAP replaces it
+with an explicit scene-to-path mapping for ground truth that no single template
+addresses, such as scenes kept under different folders.
+
 No seqinfo.ini is needed. The camera set and the frame count of a scene are
 derived from the ground-truth file itself.
 
